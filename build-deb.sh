@@ -7,7 +7,7 @@ trap 'rm -rf -- "$build_dir"' EXIT
 mkdir -p "$build_dir/DEBIAN" "$build_dir/usr/share/deepseek-client/static" "$build_dir/usr/share/applications"
 cat > "$build_dir/DEBIAN/control" <<'CONTROL'
 Package: deepseek-client
-Version: 1.0.0
+Version: 2.0.0
 Section: utils
 Priority: optional
 Architecture: all
@@ -18,8 +18,10 @@ Description: Local DeepSeek API desktop client for UOS
  Pure Python standard-library backend with a browser interface.
  Chat history, file text extraction and streamed API responses.
 CONTROL
-cp app.py extract.py index.html start.sh diagnose.sh README.md VALIDATION.md "$build_dir/usr/share/deepseek-client/"
-cp static/app.js static/style.css "$build_dir/usr/share/deepseek-client/static/"
+cp app.py protocol.py project_manager.py extract.py index.html agent.html start.sh diagnose.sh README.md VALIDATION.md AGENT_UPGRADE.md "$build_dir/usr/share/deepseek-client/"
+cp static/*.js static/*.css "$build_dir/usr/share/deepseek-client/static/"
+cp -r agent tools "$build_dir/usr/share/deepseek-client/"
+find "$build_dir/usr/share/deepseek-client" -type d -name __pycache__ -prune -exec rm -rf {} +
 cat > "$build_dir/usr/share/applications/deepseek-client.desktop" <<'DESKTOP'
 [Desktop Entry]
 Type=Application
@@ -33,4 +35,4 @@ DESKTOP
 find "$build_dir" -type d -exec chmod 755 {} +
 find "$build_dir" -type f -exec chmod 644 {} +
 chmod 755 "$build_dir/usr/share/deepseek-client/start.sh" "$build_dir/usr/share/deepseek-client/diagnose.sh"
-dpkg-deb --root-owner-group --build "$build_dir" ../deepseek-client_1.0.0_all.deb
+dpkg-deb --root-owner-group --build "$build_dir" ../deepseek-client_2.0.0_all.deb
