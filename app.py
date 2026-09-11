@@ -31,7 +31,18 @@ LOCK = threading.Lock()
 BUSY = {}
 ATTEMPTS = []
 SYSTEM = ''
-VERSION = '1.1.0'
+VERSION = '2.0.0'
+AGENT = None
+AGENT_LOCK = threading.Lock()
+
+def agent_service():
+    global AGENT
+    from agent.controller import AgentService
+    with AGENT_LOCK:
+        if AGENT is None or AGENT.store.data.parent != DATA.resolve():
+            AGENT = AgentService(DATA, lambda: os.environ.get('DEEPSEEK_API_KEY') or CONFIG.get('api_key'), api_error)
+        return AGENT
+
 
 def token():
     return os.urandom(32).hex()
@@ -140,7 +151,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self.guard():
             return
-        assets = {'/': ('index.html', 'text/html'), '/static/app.js': ('static/app.js', 'text/javascript'), '/static/style.css': ('static/style.css', 'text/css')}
+        assets = {'/agent': ('agent.html', 'text/html'), '/static/agent.js': ('static/agent.js', 'text/javascript'), '/static/agent.css': ('static/agent.css', 'text/css'), '/': ('index.html', 'text/html'), '/static/app.js': ('static/app.js', 'text/javascript'), '/static/style.css': ('static/style.css', 'text/css')}
         if self.path in assets:
             name, kind = assets[self.path]
             raw = (ROOT / name).read_bytes()
@@ -183,6 +194,8 @@ class Handler(BaseHTTPRequestHandler):
             self.out({'error': '本地处理失败，请检查磁盘空间、文件格式及运行环境'}, 500)
 
     def route(self, body):
+        if self.path.startswith(('/api/project/', '/api/file/', '/api/agent/')):
+            return self.out(agent_service().route(self.path, body))
         if self.path == '/api/setup':
             with LOCK:
                 if CONFIG:return self.out({'error':'已完成初次配置，请登录后修改'},409)
@@ -191,7 +204,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.out({'ok':True})
         if self.path == '/api/credentials':
             with LOCK:
-                if BUSY:return self.out({'error':'请等待生成结束'},409)
+                if BUSY or (AGENT is not None and AGENT.active()):return self.out({'error':'请等待生成结束或停止 Agent 任务'},409)
                 if os.environ.get('DEEPSEEK_API_KEY'):
                     return self.out({'error':'当前环境变量覆盖了 Key；请停止服务并取消该环境变量后重启，再通过网页修改'},409)
                 old=body.get('old_password','')
@@ -262,7 +275,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.out({'id': cid})
         if self.path in ('/api/settings','/api/rename'):
             with LOCK:
-                if BUSY:return self.out({'error':'请等待生成结束'},409)
+                if BUSY or (AGENT is not None and AGENT.active()):return self.out({'error':'请等待生成结束或停止 Agent 任务'},409)
                 with db() as c:
                     if not c.execute('SELECT id FROM conversations WHERE id=?',(cid,)).fetchone():
                         return self.out({'error':'会话不存在'},404)
@@ -405,6 +418,7 @@ if __name__ == '__main__':
             CONFIG={}
         except (OSError, ValueError):
             raise SystemExit('配置文件无法读取，请检查权限或恢复备份；未覆盖已有配置')
+        agent_service()  # Recover interrupted jobs before serving requests.
         try:
             server = Server(('127.0.0.1', PORT), Handler)
         except OSError:

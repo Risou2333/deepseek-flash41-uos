@@ -12,5 +12,6 @@ for name in ['ssl','sqlite3','urllib.request','xml.etree.ElementTree']:
     except ImportError:
         print(name + ': 缺失')
 print('PDF 提取：', shutil.which('pdftotext') or '未安装，可选安装 poppler-utils')
+print('Git：', shutil.which('git') or '未安装，工程读写仍可使用')
 print('本诊断不读取 API Key、不调用付费 API。')
 PY

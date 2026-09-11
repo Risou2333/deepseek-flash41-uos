@@ -18,7 +18,7 @@ for attempt in range(30):
     try:
         with urllib.request.urlopen('http://127.0.0.1:8765/api/bootstrap',timeout=1) as r:
             data=json.load(r)
-        if data.get('version')=='1.1.0':
+        if data.get('version')=='2.0.0':
             webbrowser.open('http://127.0.0.1:8765')
             break
     except Exception:
